@@ -33,3 +33,17 @@ def generate_test_data(num_records):
             expected = Calculator.divide(a, b)
 
         yield a, b, operation, expected
+
+def pytest_addoption(parser):
+    """Add a command-line option to specify the number of test records."""
+    parser.addoption("--num_records", action="store", default=5, type=int,
+                     help="Number of test records to generate")
+
+def pytest_generate_tests(metafunc):
+    """Generate tests dynamically based on the generated test data and command-line options."""
+    if "a" in metafunc.fixturenames and "b" in metafunc.fixturenames \
+            and "expected" in metafunc.fixturenames:
+        num_records = metafunc.config.getoption("--num_records")
+        # Generate test data and apply it to the tests
+        parameters = list(generate_test_data(num_records))
+        metafunc.parametrize("a,b,operation,expected", parameters)
