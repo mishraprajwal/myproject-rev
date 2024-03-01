@@ -41,3 +41,11 @@ class Calculator:
     @classmethod
     def clear_history(cls) -> None:
         cls.history.clear()
+        
+class Command:
+    def __init__(self, calculator, *args):
+        self.calculator = calculator
+        self.args = args
+
+    def execute(self):
+        raise NotImplementedError

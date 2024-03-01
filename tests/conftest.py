@@ -1,4 +1,11 @@
-# conftest.py
+# pylint: disable=redefined-outer-name
+"""
+Pytest fixtures for calculator application tests.
+
+Provides fixtures for a Calculator instance and command instances
+(add, subtract, multiply, divide) for use in testing.
+"""
+
 import pytest
 from calculator.calculator import Calculator
 from commands.add_command import AddCommand

@@ -1,11 +1,24 @@
 import sys
 from decimal import Decimal, InvalidOperation
-# Ensure correct import paths based on your project structure
-from calculator import Calculator
-from commands.add_command import AddCommand
-from commands.subtract_command import SubtractCommand
-from commands.multiply_command import MultiplyCommand
-from commands.divide_command import DivideCommand
+import pkgutil
+import importlib
+from multiprocessing import Process, Queue
+from pathlib import Path
+from calculator import Calculator, Command
+
+# Global flag to control the use of multiprocessing
+use_multiprocessing = True
+
+def load_plugins(plugin_path='plugins'):
+    command_classes = {}
+    plugins_dir = Path(__file__).resolve().parent / plugin_path
+    for _, module_name, _ in pkgutil.iter_modules([str(plugins_dir)]):
+        module = importlib.import_module(f"{plugin_path}.{module_name}")
+        for attribute_name in dir(module):
+            attribute = getattr(module, attribute_name)
+            if isinstance(attribute, type) and issubclass(attribute, Command) and attribute is not Command:
+                command_classes[module_name] = attribute
+    return command_classes
 
 def display_menu(operation_mappings):
     print("\nAvailable commands:")
@@ -14,40 +27,31 @@ def display_menu(operation_mappings):
     print("- menu (to display this menu)")
     print("- exit (to exit the application)")
 
-def calculate_and_print(calc, a, b, operation_name, operation_mappings):
+def calculate_and_print(calc, a, b, operation_name, operation_mappings, result_queue):
     try:
         a_decimal, b_decimal = map(Decimal, [a, b])
         command_class = operation_mappings.get(operation_name)
-
         if command_class:
-            command = command_class(calc, a_decimal, b_decimal)
-            result = command.execute()
-            print(f"\nThe result of {a} {operation_name} {b} is equal to {result}")
+            command_instance = command_class(calc, a_decimal, b_decimal)
+            result = command_instance.execute()
+            result_queue.put(f"\nThe result of {a} {operation_name} {b} is equal to {result}")
         else:
-            print(f"\nUnknown operation: {operation_name}")
+            result_queue.put(f"\nUnknown operation: {operation_name}")
     except InvalidOperation:
-        print(f"\nInvalid number input: {a} or {b} is not a valid number.")
+        result_queue.put(f"\nInvalid number input: {a} or {b} is not a valid number.")
     except ZeroDivisionError:
-        print("\nError: Division by zero.")
+        result_queue.put("\nError: Division by zero.")
     except Exception as e:
-        print(f"\nAn error occurred: {e}")
+        result_queue.put(f"\nAn error occurred: {e}")
 
 def main():
     calc = Calculator()
-    operation_mappings = {
-        'add': AddCommand,
-        'subtract': SubtractCommand,
-        'multiply': MultiplyCommand,
-        'divide': DivideCommand
-    }
-
-    # Display the menu right at the start before entering the loop
+    operation_mappings = load_plugins()
     display_menu(operation_mappings)
 
     while True:
         command_input = input("\nEnter command, 'menu' to display available commands, or 'exit' to exit: ").strip().lower()
         if command_input == "exit":
-            # Displaying exit message without repeating the menu since the application is exiting
             print("Exiting the application. Goodbye!")
             break
         elif command_input == "menu":
@@ -56,11 +60,21 @@ def main():
 
         args = command_input.split()
         if len(args) != 3:
-            print("Usage: <operation> <number1> <number2>")
+            print("Usage: <command> <number1> <number2>")
             continue
 
-        operation_name, a, b = args
-        calculate_and_print(calc, a, b, operation_name, operation_mappings)
+        operation_name, a, b = args[0], args[1], args[2]
+        result_queue = Queue()
+
+        if use_multiprocessing:
+            process = Process(target=calculate_and_print, args=(calc, a, b, operation_name, operation_mappings, result_queue))
+            process.start()
+            process.join()
+        else:
+            calculate_and_print(calc, a, b, operation_name, operation_mappings, result_queue)
+
+        while not result_queue.empty():
+            print(result_queue.get())
 
 if __name__ == '__main__':
     main()

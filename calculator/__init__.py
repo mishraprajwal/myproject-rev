@@ -1,2 +1,2 @@
-# This can be left empty or used to expose classes/functions
-from .calculator import Calculator
+# calculator/__init__.py
+from .calculator import Calculator, Command
