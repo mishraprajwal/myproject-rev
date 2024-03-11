@@ -5,6 +5,12 @@ import importlib
 from multiprocessing import Process, Queue
 from pathlib import Path
 from calculator import Calculator, Command
+import logging
+
+# Configure the logging
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s - %(levelname)s - %(name)s: %(message)s',
+                    datefmt='%Y-%m-%d %H:%M:%S')
 
 # Global flag to control the use of multiprocessing
 use_multiprocessing = True
@@ -12,8 +18,10 @@ use_multiprocessing = True
 def load_plugins(plugin_path='plugins'):
     command_classes = {}
     plugins_dir = Path(__file__).resolve().parent / plugin_path
+    logging.info(f"Loading plugins from {plugins_dir}")
     for _, module_name, _ in pkgutil.iter_modules([str(plugins_dir)]):
         module = importlib.import_module(f"{plugin_path}.{module_name}")
+        logging.info(f"Loaded plugin {module_name}")
         for attribute_name in dir(module):
             attribute = getattr(module, attribute_name)
             if isinstance(attribute, type) and issubclass(attribute, Command) and attribute is not Command:
@@ -43,8 +51,10 @@ def calculate_and_print(calc, a, b, operation_name, operation_mappings, result_q
         result_queue.put("\nError: Division by zero.")
     except Exception as e:
         result_queue.put(f"\nAn error occurred: {e}")
+        logging.error(f"An error occurred during calculation: {e}", exc_info=True)
 
 def main():
+    logging.info("Application started")
     calc = Calculator()
     operation_mappings = load_plugins()
     display_menu(operation_mappings)
@@ -52,6 +62,7 @@ def main():
     while True:
         command_input = input("\nEnter command, 'menu' to display available commands, or 'exit' to exit: ").strip().lower()
         if command_input == "exit":
+            logging.info("Exiting the application.")
             print("Exiting the application. Goodbye!")
             break
         elif command_input == "menu":
@@ -63,7 +74,7 @@ def main():
             print("Usage: <command> <number1> <number2>")
             continue
 
-        operation_name, a, b = args[0], args[1], args[2]
+        operation_name, a, b = args
         result_queue = Queue()
 
         if use_multiprocessing:
